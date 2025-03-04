@@ -15,6 +15,54 @@
 # █                                                            █
 # █████████████████████████████████████████████████████████████
 
+#!/usr/bin/env bash
+# 修复版安装脚本核心部分
+
+install_hysteria() {
+    # 确保服务停止
+    systemctl stop hysteria-server 2>/dev/null
+    pkill -9 hysteria
+    sleep 2  # 等待进程释放
+
+    # 创建临时目录
+    local temp_dir=$(mktemp -d)
+    cd "$temp_dir" || exit 1
+
+    # 获取架构信息
+    case $(uname -m) in
+        x86_64)  HY_ARCH="amd64" ;;
+        aarch64) HY_ARCH="arm64" ;;
+        armv7l)  HY_ARCH="arm" ;;
+        *) log ERROR "Unsupported architecture"; exit 1 ;;
+    esac
+
+    # 带重试机制的下载
+    for i in {1..3}; do
+        LATEST_VER=$(curl -s https://api.github.com/repos/apernet/hysteria/releases/latest | grep tag_name | cut -d'"' -f4)
+        DOWNLOAD_URL="https://github.com/apernet/hysteria/releases/download/$LATEST_VER/hysteria-linux-$HY_ARCH"
+        
+        if curl -L -o hysteria \
+            --connect-timeout 30 \
+            --retry 3 \
+            --retry-delay 10 \
+            "$DOWNLOAD_URL"; then
+            break
+        elif [[ $i -eq 3 ]]; then
+            log ERROR "Download failed after 3 attempts"
+            exit 1
+        fi
+        sleep $((i*5))
+    done
+
+    # 原子操作替换文件
+    sudo install -m 755 hysteria /usr/local/bin/hysteria.new
+    sudo mv /usr/local/bin/hysteria.new /usr/local/bin/hysteria
+
+    # 清理临时文件
+    cd ..
+    rm -rf "$temp_dir"
+}
+
 # 配置常量
 HYSTERIA_BIN="/usr/local/bin/hysteria"
 CONFIG_DIR="/etc/hysteria"
