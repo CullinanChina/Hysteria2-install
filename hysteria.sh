@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Hysteria 2 一键管理脚本
 # 增强功能：协议混淆 + 流量统计
-# 版本：v2.3.0
-# 更新日期：2024-06-05
+# 版本：v2.2.0
+# 更新日期：2025-02-25
 
 export LANG=en_US.UTF-8
-VERSION="v2.3.0"
+VERSION="v2.2.0"
 LOG_FILE="/var/log/hysteria.log"
 STATS_FILE="/etc/hysteria/stats.data"
 
