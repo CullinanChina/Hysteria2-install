@@ -245,5 +245,22 @@ uninstall() {
     systemctl daemon-reload
     log PASS "已彻底移除所有组件"
 }
+DEPS_MAP=(
+    [file]="file"
+    [curl]=""
+    [jq]="jq"
+    [openssl]="openssl"
+    [qrencode]="qrencode"
+    [nginx]="nginx"
+)
+log INFO "获取最新版本..."
+version=$(
+    { curl -sL "${BACKUP_MIRROR}/stable_version.txt" || \
+    curl -s "https://api.github.com/repos/apernet/hysteria/releases/latest" | jq -r .tag_name; } \
+    | grep -Eo 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1
+)
+[[ -z "$version" ]] && { log FAIL "无法获取版本信息"; exit 1; }
+replace download_with_retry function
+
 
 main_menu "$@"
