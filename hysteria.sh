@@ -60,21 +60,16 @@ inst_cert(){
     echo -e " ${GREEN}3.${PLAIN} 自定义证书路径"
     echo ""
     read -rp "请输入选项 [1-3]: " certInput
-
     if [[ $certInput == 2 ]]; then
-        cert_path="/etc/hysteria/cert/server.crt"
-        key_path="/etc/hysteria/cert/server.key"
+        cert_path="/root/cert.crt"
+        key_path="/root/private.key"
 
-        mkdir -p /etc/hysteria/cert
-        chown -R root:root /etc/hysteria
-        chmod 755 /etc/hysteria
+        chmod -R 777 /root
+        
+        chmod +rw /root/cert.crt
+        chmod +rw /root/private.key
 
-        # ❌ 删除了下面三行（旧 /root 残留）
-        # chmod -R 777 /root
-        # chmod +rw /root/cert.crt
-        # chmod +rw /root/private.key
-
-        if [[ -f ${cert_path} && -f ${key_path} ]] && [[ -s ${cert_path} && -s ${key_path} ]] && [[ -f /root/ca.log ]]; then
+        if [[ -f /root/cert.crt && -f /root/private.key ]] && [[ -s /root/cert.crt && -s /root/private.key ]] && [[ -f /root/ca.log ]]; then
             domain=$(cat /root/ca.log)
             green "检测到原有域名：$domain 的证书，正在应用"
             hy_domain=$domain
@@ -94,7 +89,6 @@ inst_cert(){
             read -p "请输入需要申请证书的域名：" domain
             [[ -z $domain ]] && red "未输入域名，无法执行操作！" && exit 1
             green "已输入的域名：$domain" && sleep 1
-
             domainIP=$(dig @8.8.8.8 +time=2 +short "$domain" 2>/dev/null)
             if echo $domainIP | grep -q "network unreachable\|timed out" || [[ -z $domainIP ]]; then
                 domainIP=$(dig @2001:4860:4860::8888 +time=2 aaaa +short "$domain" 2>/dev/null)
@@ -112,7 +106,6 @@ inst_cert(){
                     exit 1
                 fi
             fi
-
             if [[ $domainIP == $ip ]]; then
                 ${PACKAGE_INSTALL[int]} curl wget sudo socat openssl
                 if [[ $SYSTEM == "CentOS" ]]; then
@@ -124,33 +117,23 @@ inst_cert(){
                     systemctl start cron
                     systemctl enable cron
                 fi
-
                 curl https://get.acme.sh | sh -s email=$(date +%s%N | md5sum | cut -c 1-16)@gmail.com
                 source ~/.bashrc
                 bash ~/.acme.sh/acme.sh --upgrade --auto-upgrade
                 bash ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
-
                 if [[ -n $(echo $ip | grep ":") ]]; then
                     bash ~/.acme.sh/acme.sh --issue -d ${domain} --standalone -k ec-256 --listen-v6 --insecure
                 else
                     bash ~/.acme.sh/acme.sh --issue -d ${domain} --standalone -k ec-256 --insecure
                 fi
-
-                bash ~/.acme.sh/acme.sh --install-cert -d ${domain} \
-                    --key-file ${key_path} \
-                    --fullchain-file ${cert_path} --ecc
-
-                # ✅ 新增（截图里的最后一步）
-                chmod 600 ${key_path}
-                chmod 644 ${cert_path}
-
-                if [[ -f ${cert_path} && -f ${key_path} ]] && [[ -s ${cert_path} && -s ${key_path} ]]; then
+                bash ~/.acme.sh/acme.sh --install-cert -d ${domain} --key-file /root/private.key --fullchain-file /root/cert.crt --ecc
+                if [[ -f /root/cert.crt && -f /root/private.key ]] && [[ -s /root/cert.crt && -s /root/private.key ]]; then
                     echo $domain > /root/ca.log
                     sed -i '/--cron/d' /etc/crontab >/dev/null 2>&1
                     echo "0 0 * * * root bash /root/.acme.sh/acme.sh --cron -f >/dev/null 2>&1" >> /etc/crontab
-                    green "证书申请成功!"
-                    yellow "证书crt文件路径如下: ${cert_path}"
-                    yellow "私钥key文件路径如下: ${key_path}"
+                    green "证书申请成功! 脚本申请到的证书 (cert.crt) 和私钥 (private.key) 文件已保存到 /root 文件夹下"
+                    yellow "证书crt文件路径如下: /root/cert.crt"
+                    yellow "私钥key文件路径如下: /root/private.key"
                     hy_domain=$domain
                 fi
             else
@@ -162,7 +145,6 @@ inst_cert(){
                 exit 1
             fi
         fi
-
     elif [[ $certInput == 3 ]]; then
         read -p "请输入公钥文件 crt 的路径：" cert_path
         yellow "公钥文件 crt 的路径：$cert_path "
@@ -174,7 +156,6 @@ inst_cert(){
 
         chmod +rw $cert_path
         chmod +rw $key_path
-
     else
         green "将使用必应自签证书作为 Hysteria 2 的节点证书"
 
